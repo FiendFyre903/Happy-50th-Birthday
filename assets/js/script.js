@@ -230,14 +230,14 @@ function parseSenderFromFilename(filename) {
     if (!filename) return 'Anonymous';
     const normalized = filename.replace(/^@file:/i, '').trim();
     const baseName = normalized.replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '');
-    const parts = baseName
-        .split(/[_-]/)
+    const people = baseName
+        .split('_')
         .filter(Boolean)
         .map(part => part.replace(/-/g, ' ').trim())
         .filter(Boolean);
 
-    if (parts.length === 0) return 'Anonymous';
-    return parts.map(titleCase).join(' & ');
+    if (people.length === 0) return 'Anonymous';
+    return people.map(titleCase).join(' & ');
 }
 
 function resolveMediaPath(fileName) {
@@ -273,7 +273,9 @@ function getMediaInfo(message) {
 }
 
 function getMessageSender(message) {
-    if (message.name) return message.name;
+    if (Object.prototype.hasOwnProperty.call(message, 'name')) {
+        return message.name;
+    }
     const mediaFile = message.file || message.photo || message.video;
     if (mediaFile) {
         return parseSenderFromFilename(mediaFile);
@@ -288,7 +290,7 @@ function openMessageModal(message) {
 
     const senderName = getMessageSender(message);
     const mediaInfo = getMediaInfo(message);
-    let content = `<h2>${escapeHtml(senderName)}</h2>`;
+    let content = senderName ? `<h2>${escapeHtml(senderName)}</h2>` : '';
 
     if (message.text) {
         const lines = message.text.split('\n').filter(Boolean);
@@ -346,18 +348,20 @@ function renderPhotoGallery() {
             innerHtml = `
                 <video muted playsinline preload="metadata" src="${media.src}"></video>
                 <div class="video-overlay"><div class="play-button">▶</div></div>
+                ${media.sender || media.caption ? `
                 <div class="photo-caption">
-                    <strong>${escapeHtml(media.sender)}</strong>
-                    <p>${escapeHtml(media.caption)}</p>
-                </div>
+                    ${media.sender ? `<strong>${escapeHtml(media.sender)}</strong>` : ''}
+                    ${media.caption ? `<p>${escapeHtml(media.caption)}</p>` : ''}
+                </div>` : ''}
             `;
         } else {
             innerHtml = `
                 <img src="${media.src}" alt="${escapeHtml(media.alt || media.sender)}" loading="lazy">
+                ${media.sender || media.caption ? `
                 <div class="photo-caption">
-                    <strong>${escapeHtml(media.sender)}</strong>
-                    <p>${escapeHtml(media.caption)}</p>
-                </div>
+                    ${media.sender ? `<strong>${escapeHtml(media.sender)}</strong>` : ''}
+                    ${media.caption ? `<p>${escapeHtml(media.caption)}</p>` : ''}
+                </div>` : ''}
             `;
         }
 
@@ -620,7 +624,7 @@ function renderContributorCollage() {
     allMessages.forEach(item => contributors.add(getMessageSender(item)));
     allPhotos.forEach(item => contributors.add(item.sender || getMessageSender(item)));
 
-    const names = Array.from(contributors);
+    const names = Array.from(contributors).filter(Boolean);
     grid.innerHTML = '';
 
     names.forEach((name, index) => {
